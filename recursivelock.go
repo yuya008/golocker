@@ -4,47 +4,60 @@
 package golocker
 
 import (
-	"errors"
-	"sync/atomic"
+	"sync"
 )
 
 type RecursiveLocker struct {
-	gid uint64
-	keeper *Keeper
+	gid int64
+	mutex sync.Mutex
+	cond *sync.Cond
 }
 
 func NewRecursiveLocker() *RecursiveLocker {
-	return &RecursiveLocker{
-		keeper: NewKeeper(),
+	locker := &RecursiveLocker{
+		gid: -1,
 	}
+	locker.cond = sync.NewCond(&locker.mutex)
+	return locker
 }
 
-func (locker *RecursiveLocker) Acquire(gid uint64) error {
-	if gid == 0 {
-		return errors.New("goroutine id == 0")
+func (locker *RecursiveLocker) Acquire(gid int64) {
+	if gid < 0 {
+		panic("goroutine id < 0")
 	}
+	locker.mutex.Lock()
+	defer locker.mutex.Unlock()
 	for {
-		if atomic.CompareAndSwapUint64(&locker.gid, 0, gid) ||
-				atomic.CompareAndSwapUint64(&locker.gid, gid, gid) {
-			return nil
+		if locker.gid < 0 {
+			locker.gid = gid
+			return
+		} else if locker.gid == gid {
+			return
 		}
-		locker.keeper.Wait()
+		locker.cond.Wait()
 	}
-	return nil
 }
 
-func (locker *RecursiveLocker) TryAcquire(gid uint64) (error, bool) {
-	if gid == 0 {
-		return errors.New("goroutine id == 0"), false
+func (locker *RecursiveLocker) TryAcquire(gid int64) (ret bool) {
+	if gid < 0 {
+		panic("goroutine id < 0")
 	}
-	if atomic.CompareAndSwapUint64(&locker.gid, 0, gid) ||
-			atomic.CompareAndSwapUint64(&locker.gid, gid, gid) {
-		return nil, true
+	locker.mutex.Lock()
+	defer locker.mutex.Unlock()
+	if locker.gid < 0 {
+		locker.gid = gid
+		ret = true
+	} else if locker.gid == gid {
+		ret = true
+	} else {
+		ret = false
 	}
-	return nil, false
+	return
 }
 
 func (locker *RecursiveLocker) Release() {
-	atomic.StoreUint64(&locker.gid, 0)
-	locker.keeper.Notify()
+	locker.mutex.Lock()
+	defer locker.mutex.Unlock()
+	locker.gid = -1
+	locker.cond.Signal()
 }
