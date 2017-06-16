@@ -1,7 +1,7 @@
 //
 // 递归锁实现
 //
-package golock
+package golocker
 
 import (
 	"errors"
@@ -10,12 +10,12 @@ import (
 
 type RecursiveLocker struct {
 	gid uint64
-	signalChan chan bool
+	keeper *Keeper
 }
 
 func NewRecursiveLocker() *RecursiveLocker {
 	return &RecursiveLocker{
-		signalChan: make(chan bool),
+		keeper: NewKeeper(),
 	}
 }
 
@@ -26,9 +26,9 @@ func (locker *RecursiveLocker) Acquire(gid uint64) error {
 	for {
 		if atomic.CompareAndSwapUint64(&locker.gid, 0, gid) ||
 				atomic.CompareAndSwapUint64(&locker.gid, gid, gid) {
-			break
+			return nil
 		}
-		<- locker.signalChan
+		locker.keeper.Wait()
 	}
 	return nil
 }
@@ -44,13 +44,7 @@ func (locker *RecursiveLocker) TryAcquire(gid uint64) (error, bool) {
 	return nil, false
 }
 
-func (locker *RecursiveLocker) Release(gid uint64) error {
-	if gid == 0 {
-		return errors.New("goroutine id == 0")
-	}
-	if !atomic.CompareAndSwapUint64(&locker.gid, gid, 0) {
-		return errors.New("goroutine id invalid")
-	}
-	locker.signalChan <- true
-	return nil
+func (locker *RecursiveLocker) Release() {
+	atomic.StoreUint64(&locker.gid, 0)
+	locker.keeper.Notify()
 }

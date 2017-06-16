@@ -1,4 +1,4 @@
 //
 // 组锁实现
 //
-package golock
+package golocker

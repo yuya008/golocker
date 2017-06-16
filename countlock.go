@@ -1,4 +1,4 @@
 //
 // 计数锁实现
 //
-package golock
+package golocker
