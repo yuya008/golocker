@@ -14,8 +14,8 @@ func init() {
 func TestRecursiveLocker(t *testing.T) {
 	var all int64
 	var wg sync.WaitGroup
-	wg.Add(10000000)
-	for i := 1; i <= 10000000; i++ {
+	wg.Add(100000)
+	for i := 1; i <= 100000; i++ {
 		go func(j int64) {
 			recursiveLocker.Acquire(j)
 			all += j

@@ -14,8 +14,8 @@ func init() {
 func TestSeqLocker(t *testing.T) {
 	var b uint64
 	var wg sync.WaitGroup
-	wg.Add(1000000)
-	for i := 1; i <= 1000000; i++ {
+	wg.Add(100000)
+	for i := 1; i <= 100000; i++ {
 		go func(i uint64) {
 			seqLocker.Lock()
 			b += i
